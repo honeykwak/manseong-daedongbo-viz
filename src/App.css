@@ -1,0 +1,124 @@
+/* General App Styling */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Sidebar */
+.sidebar {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 220px;
+  max-height: calc(100vh - 20px);
+  background-color: rgba(40, 40, 40, 0.85);
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar h4 {
+  margin: 0 0 10px 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #555;
+  color: #00aaff;
+  font-size: 16px;
+}
+
+.key-figures-list {
+  overflow-y: auto;
+  flex-grow: 1;
+}
+
+.checkbox-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.checkbox-container input {
+  margin-right: 10px;
+  width: 16px;
+  height: 16px;
+}
+
+.checkbox-container label {
+  font-size: 14px;
+  cursor: pointer;
+}
+
+
+/* Graph Container */
+.graph-container {
+  flex-grow: 1;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.graph-container:active {
+    cursor: grabbing;
+}
+
+/* Info Panel */
+.info-panel {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 280px;
+  max-height: calc(100vh - 20px);
+  overflow-y: auto;
+  background-color: rgba(40, 40, 40, 0.8);
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  transition: transform 0.3s ease-in-out;
+}
+
+.info-panel.hidden {
+  transform: translateX(calc(100% + 30px));
+}
+
+.info-panel h3 {
+  margin-top: 0;
+  color: #00aaff;
+  border-bottom: 1px solid #555;
+  padding-bottom: 10px;
+}
+
+.info-panel p {
+  margin: 8px 0;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.info-panel strong {
+  color: #b0b0b0;
+  margin-right: 8px;
+}
+
+/* Loader */
+.loader {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 1.5em;
+  color: #e0e0e0;
+}
