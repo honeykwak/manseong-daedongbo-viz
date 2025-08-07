@@ -62,7 +62,8 @@ function App() {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [keyFigures, setKeyFigures] = useState([]);
   const [checkedState, setCheckedState] = useState({});
-  const [degreeFilter, setDegreeFilter] = useState(1); // New state for degree
+  const [degreeFilter, setDegreeFilter] = useState(1);
+  const [edgeTypeFilter, setEdgeTypeFilter] = useState({ PARENT_CHILD: true, POTENTIAL_AFFILIATION: true });
   const [selectedNode, setSelectedNode] = useState(null);
   const [loading, setLoading] = useState(true);
   const fgRef = useRef();
@@ -98,11 +99,24 @@ function App() {
     if (loading || !allData.idMap.size) return;
     
     const activeKeyNodeIds = Object.keys(checkedState).filter(id => checkedState[id]);
-    const filteredData = filterGraphByDegree(allData.nodes, allData.links, activeKeyNodeIds, degreeFilter);
+    const degreeFilteredData = filterGraphByDegree(allData.nodes, allData.links, activeKeyNodeIds, degreeFilter);
     
-    setGraphData(filteredData);
+    const fullyFilteredLinks = degreeFilteredData.links.filter(link => edgeTypeFilter[link.type]);
+    const nodesInFilteredLinks = new Set();
+    fullyFilteredLinks.forEach(link => {
+      nodesInFilteredLinks.add(link.source);
+      nodesInFilteredLinks.add(link.target);
+    });
 
-  }, [checkedState, degreeFilter, allData, loading]);
+    // Ensure all key figures remain, even if they have no visible links
+    activeKeyNodeIds.forEach(id => {
+      const node = allData.idMap.get(id);
+      if (node) nodesInFilteredLinks.add(node);
+    });
+
+    setGraphData({ nodes: Array.from(nodesInFilteredLinks), links: fullyFilteredLinks });
+
+  }, [checkedState, degreeFilter, edgeTypeFilter, allData, loading]);
 
   // --- Physics Engine Configuration ---
   useEffect(() => {
@@ -127,6 +141,25 @@ function App() {
   // --- (Rest of the component) ---
   const handleCheckboxChange = (figureId) => setCheckedState(p => ({...p, [figureId]: !p[figureId]}));
   const handleDegreeChange = (newDegree) => setDegreeFilter(newDegree);
+  const handleEdgeTypeChange = (type) => {
+    setEdgeTypeFilter(prev => {
+      const newFilter = { ...prev, [type]: !prev[type] };
+      // Prevent unchecking the last one
+      if (Object.values(newFilter).filter(v => v).length === 0) {
+        return prev;
+      }
+      return newFilter;
+    });
+  };
+
+  const handleSelectAllKeyFigures = (selectAll) => {
+    const newCheckedState = {};
+    keyFigures.forEach(figure => {
+      newCheckedState[figure.id] = selectAll;
+    });
+    setCheckedState(newCheckedState);
+  };
+
   const handleNodeClick = useCallback(node => { setSelectedNode(node); fgRef.current.centerAt(node.x, node.y, 1000); }, [fgRef]);
   const nodeCanvasObject = (node, ctx, globalScale) => {
     const label = `${node.name_hangeul}`;
@@ -154,6 +187,9 @@ function App() {
         onCheckboxChange={handleCheckboxChange}
         degreeFilter={degreeFilter}
         onDegreeChange={handleDegreeChange}
+        edgeTypeFilter={edgeTypeFilter}
+        onEdgeTypeChange={handleEdgeTypeChange}
+        onSelectAllKeyFigures={handleSelectAllKeyFigures}
       />
       <div className="graph-container">
         <ForceGraph2D
