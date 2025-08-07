@@ -94,7 +94,6 @@ dist
 # Gatsby build output
 .cache/
 # Add any directories created for static files with gatsby-source-filesystem, e.g. public/
-public
 
 # vuepress build output
 .vuepress/dist
