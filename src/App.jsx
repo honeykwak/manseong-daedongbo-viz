@@ -5,41 +5,54 @@ import Sidebar from './Sidebar';
 import { keyFigureIds } from './keyFigureIds';
 import './App.css';
 
-// --- Helper Function to find disconnected clusters ---
-const findClusters = (nodes, links) => {
+// --- Helper: BFS for degree-based filtering ---
+const filterGraphByDegree = (allNodes, allLinks, startNodeIds, degree) => {
+  if (startNodeIds.length === 0) return { nodes: [], links: [] };
+
   const adj = new Map();
-  nodes.forEach(node => adj.set(node.id, []));
-  links.forEach(link => {
-    adj.get(link.source.id).push(link.target.id);
-    adj.get(link.target.id).push(link.source.id);
+  allNodes.forEach(node => adj.set(node.id, []));
+  allLinks.forEach(link => {
+    adj.get(link.source.id).push(link.target);
+    adj.get(link.target.id).push(link.source);
   });
 
-  const visited = new Set();
-  const clusters = new Map();
-  let clusterId = 0;
+  const nodesToShow = new Set();
+  const linksToShow = new Set();
+  const q = [];
+  const distances = new Map();
 
-  nodes.forEach(node => {
-    if (!visited.has(node.id)) {
-      const component = [];
-      const q = [node.id];
-      visited.add(node.id);
-      
-      while (q.length > 0) {
-        const u = q.shift();
-        component.push(u);
-        adj.get(u).forEach(v => {
-          if (!visited.has(v)) {
-            visited.add(v);
-            q.push(v);
-          }
-        });
-      }
-      
-      component.forEach(nodeId => clusters.set(nodeId, clusterId));
-      clusterId++;
+  startNodeIds.forEach(id => {
+    const startNode = allNodes.find(n => n.id === id);
+    if (startNode) {
+      q.push(startNode);
+      distances.set(startNode.id, 0);
+      nodesToShow.add(startNode);
     }
   });
-  return { clusters, clusterCount: clusterId };
+
+  let head = 0;
+  while(head < q.length) {
+    const u = q[head++];
+    const dist = distances.get(u.id);
+
+    if (dist >= degree) continue;
+
+    adj.get(u.id)?.forEach(v => {
+      if (!distances.has(v.id)) {
+        distances.set(v.id, dist + 1);
+        nodesToShow.add(v);
+        q.push(v);
+      }
+    });
+  }
+  
+  allLinks.forEach(link => {
+    if (nodesToShow.has(link.source) && nodesToShow.has(link.target)) {
+      linksToShow.add(link);
+    }
+  });
+
+  return { nodes: Array.from(nodesToShow), links: Array.from(linksToShow) };
 };
 
 
@@ -49,6 +62,7 @@ function App() {
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [keyFigures, setKeyFigures] = useState([]);
   const [checkedState, setCheckedState] = useState({});
+  const [degreeFilter, setDegreeFilter] = useState(1); // New state for degree
   const [selectedNode, setSelectedNode] = useState(null);
   const [loading, setLoading] = useState(true);
   const fgRef = useRef();
@@ -61,18 +75,12 @@ function App() {
         const idMap = new Map(rawdata.nodes.map(node => [node.id, node]));
         const links = rawdata.edges.map(edge => ({ ...edge, source: idMap.get(edge.source), target: idMap.get(edge.target) }));
         
-        // 1. Find clusters
         const { clusters, clusterCount } = findClusters(rawdata.nodes, links);
         rawdata.nodes.forEach(node => node.cluster = clusters.get(node.id));
 
-        // 2. Pre-calculate reciprocal relationships
         const affiliationLinks = new Set();
-        links.forEach(edge => {
-            if (edge.type === 'POTENTIAL_AFFILIATION') affiliationLinks.add(`${edge.source.id}-${edge.target.id}`);
-        });
-        links.forEach(link => {
-            link.isReciprocal = link.type === 'POTENTIAL_AFFILIATION' ? affiliationLinks.has(`${link.target.id}-${link.source.id}`) : false;
-        });
+        links.forEach(edge => { if (edge.type === 'POTENTIAL_AFFILIATION') affiliationLinks.add(`${edge.source.id}-${edge.target.id}`); });
+        links.forEach(link => { link.isReciprocal = link.type === 'POTENTIAL_AFFILIATION' ? affiliationLinks.has(`${link.target.id}-${link.source.id}`) : false; });
 
         const figures = keyFigureIds.map(id => idMap.get(id)).filter(Boolean);
         setKeyFigures(figures);
@@ -88,28 +96,13 @@ function App() {
   // --- Graph Data Calculation ---
   useEffect(() => {
     if (loading || !allData.idMap.size) return;
-    // ... (rest of the logic is the same)
-    const nodesToShow = new Set();
-    const linksToShow = new Set();
-    const checkedIds = Object.keys(checkedState).filter(id => checkedState[id]);
+    
+    const activeKeyNodeIds = Object.keys(checkedState).filter(id => checkedState[id]);
+    const filteredData = filterGraphByDegree(allData.nodes, allData.links, activeKeyNodeIds, degreeFilter);
+    
+    setGraphData(filteredData);
 
-    checkedIds.forEach(id => {
-      const figureNode = allData.idMap.get(id);
-      if (figureNode) {
-        nodesToShow.add(figureNode);
-        allData.links.forEach(link => {
-          if (link.source.id === id) {
-            nodesToShow.add(link.target);
-            linksToShow.add(link);
-          } else if (link.target.id === id) {
-            nodesToShow.add(link.source);
-            linksToShow.add(link);
-          }
-        });
-      }
-    });
-    setGraphData({ nodes: Array.from(nodesToShow), links: Array.from(linksToShow) });
-  }, [checkedState, allData, loading]);
+  }, [checkedState, degreeFilter, allData, loading]);
 
   // --- Physics Engine Configuration ---
   useEffect(() => {
@@ -117,29 +110,23 @@ function App() {
     const simulation = fgRef.current.d3Force();
     if (!simulation) return;
 
-    // 1. Define cluster centers
     const clusterPositions = {};
     const angleStep = 2 * Math.PI / allData.clusterCount;
-    const radius = 400; // Radius of the circle on which clusters are placed
+    const radius = 400;
     for (let i = 0; i < allData.clusterCount; i++) {
-        clusterPositions[i] = {
-            x: radius * Math.cos(angleStep * i),
-            y: radius * Math.sin(angleStep * i)
-        };
+        clusterPositions[i] = { x: radius * Math.cos(angleStep * i), y: radius * Math.sin(angleStep * i) };
     }
 
-    // 2. Remove default centering force and apply cluster forces
     simulation.force('center', null);
     simulation.force('x', forceX(node => clusterPositions[node.cluster]?.x || 0).strength(0.05));
     simulation.force('y', forceY(node => clusterPositions[node.cluster]?.y || 0).strength(0.05));
-    
-    // 3. Adjust link strength
     simulation.force('link').strength(link => link.type === 'PARENT_CHILD' ? 0.5 : 0.1);
 
   }, [loading, allData.clusterCount]);
 
-  // --- (Rest of the component: Handlers, Rendering, etc.) ---
+  // --- (Rest of the component) ---
   const handleCheckboxChange = (figureId) => setCheckedState(p => ({...p, [figureId]: !p[figureId]}));
+  const handleDegreeChange = (newDegree) => setDegreeFilter(newDegree);
   const handleNodeClick = useCallback(node => { setSelectedNode(node); fgRef.current.centerAt(node.x, node.y, 1000); }, [fgRef]);
   const nodeCanvasObject = (node, ctx, globalScale) => {
     const label = `${node.name_hangeul}`;
@@ -161,7 +148,13 @@ function App() {
 
   return (
     <div className="app-container">
-      <Sidebar keyFigures={keyFigures} checkedState={checkedState} onCheckboxChange={handleCheckboxChange} />
+      <Sidebar 
+        keyFigures={keyFigures} 
+        checkedState={checkedState} 
+        onCheckboxChange={handleCheckboxChange}
+        degreeFilter={degreeFilter}
+        onDegreeChange={handleDegreeChange}
+      />
       <div className="graph-container">
         <ForceGraph2D
           ref={fgRef}
@@ -201,5 +194,42 @@ function App() {
     </div>
   );
 }
+
+// Re-add findClusters helper function that was inside the previous App component
+const findClusters = (nodes, links) => {
+  const adj = new Map();
+  nodes.forEach(node => adj.set(node.id, []));
+  links.forEach(link => {
+    adj.get(link.source.id).push(link.target.id);
+    adj.get(link.target.id).push(link.source.id);
+  });
+
+  const visited = new Set();
+  const clusters = new Map();
+  let clusterId = 0;
+
+  nodes.forEach(node => {
+    if (!visited.has(node.id)) {
+      const component = [];
+      const q = [node.id];
+      visited.add(node.id);
+      
+      while (q.length > 0) {
+        const u = q.shift();
+        component.push(u);
+        adj.get(u).forEach(v => {
+          if (!visited.has(v)) {
+            visited.add(v);
+            q.push(v);
+          }
+        });
+      }
+      
+      component.forEach(nodeId => clusters.set(nodeId, clusterId));
+      clusterId++;
+    }
+  });
+  return { clusters, clusterCount: clusterId };
+};
 
 export default App;

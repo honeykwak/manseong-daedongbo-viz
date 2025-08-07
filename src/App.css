@@ -63,6 +63,32 @@ body {
   cursor: pointer;
 }
 
+.sidebar-divider {
+  height: 1px;
+  background-color: #555;
+  margin: 15px 0;
+}
+
+.degree-filter {
+  padding-top: 5px;
+}
+
+.degree-filter label {
+  font-size: 14px;
+  display: block;
+  margin-bottom: 10px;
+}
+
+.degree-filter strong {
+    color: #00aaff;
+    font-size: 16px;
+}
+
+.degree-filter input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+}
+
 
 /* Graph Container */
 .graph-container {
