@@ -152,23 +152,11 @@ function App() {
             ctx.moveTo(link.source.x, link.source.y);
             ctx.lineTo(link.target.x, link.target.y);
             ctx.stroke();
-
-            if (isParentChild) {
-              const to = link.target;
-              const from = link.source;
-              const angle = Math.atan2(to.y - from.y, to.x - from.x);
-              const headlen = 6;
-              ctx.save();
-              ctx.translate(to.x, to.y);
-              ctx.rotate(angle);
-              ctx.beginPath();
-              ctx.moveTo(-headlen, headlen / 2);
-              ctx.lineTo(0, 0);
-              ctx.lineTo(-headlen, -headlen / 2);
-              ctx.stroke();
-              ctx.restore();
-            }
           }}
+          linkDirectionalParticles={link => link.type === 'PARENT_CHILD' ? 4 : 0}
+          linkDirectionalParticleWidth={2.5}
+          linkDirectionalParticleColor={() => 'cyan'}
+          linkDirectionalParticleSpeed={0.008}
           onNodeClick={handleNodeClick}
           onBackgroundClick={() => setSelectedNode(null)}
           nodeRelSize={4}
